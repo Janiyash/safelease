@@ -1,0 +1,60 @@
+version: '3.9'
+
+services:
+  mongo:
+    image: mongo:7
+    container_name: safelease_mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: safelease
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: safelease_backend
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      MONGODB_URI: mongodb://mongo:27017/safelease
+      JWT_SECRET: safelease_dev_jwt_secret_32_chars_min!!
+      JWT_REFRESH_SECRET: safelease_dev_refresh_secret_32min!!
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      FRONTEND_URL: http://localhost:3000
+      UPLOAD_PATH: /app/uploads
+    volumes:
+      - ./backend/src:/app/src
+      - uploads_data:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: safelease_frontend
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      REACT_APP_API_URL: http://localhost:5000/api
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
+  uploads_data:
