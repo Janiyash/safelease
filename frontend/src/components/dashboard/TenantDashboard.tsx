@@ -6,9 +6,13 @@ import { useAuth } from '../../context/AuthContext';
 import { complaintApi, noticeApi } from '../../api/services';
 import { StatCard, StatusBadge, EmptyState } from '../shared';
 import { StatsGridSkeleton, ComplaintSkeleton } from '../skeleton/Skeletons';
-import { MOCK_COMPLAINTS, MOCK_NOTICES, MOCK_PROPERTIES } from '../../data/mockData';
+import { MOCK_COMPLAINTS, MOCK_NOTICES } from '../../data/mockData';
 import { Complaint, Notice } from '../../types';
 import { formatDistanceToNow } from 'date-fns';
+import { isMockToken } from '../../api/mockAuth';
+import { mockComplaintOps, mockNoticeOps } from '../../api/mockOperations';
+
+const isMock = () => isMockToken(localStorage.getItem('accessToken'));
 
 const categoryColors: Record<string, string> = {
   emergency: '#ef4444', maintenance: '#f59e0b', general: '#2563eb', event: '#10b981', billing: '#8b5cf6',
@@ -20,20 +24,30 @@ const TenantDashboard: React.FC = () => {
 
   const { data: complData, isLoading: complLoading } = useQuery({
     queryKey: ['complaints'],
-    queryFn: () => complaintApi.getAll({ limit: 5 }).then(r => r.data.data).catch(() => ({ complaints: MOCK_COMPLAINTS })),
+    staleTime: 0,
+    queryFn: async () => {
+      if (isMock()) return mockComplaintOps.getAll();
+      return complaintApi.getAll({ limit: 5 }).then(r => r.data.data).catch(() => mockComplaintOps.getAll());
+    },
   });
+
   const { data: noticeData, isLoading: noticeLoading } = useQuery({
     queryKey: ['notices'],
-    queryFn: () => noticeApi.getAll({ limit: 4 }).then(r => r.data.data).catch(() => ({ notices: MOCK_NOTICES })),
+    staleTime: 0,
+    queryFn: async () => {
+      if (isMock()) return mockNoticeOps.getAll();
+      return noticeApi.getAll({ limit: 4 }).then(r => r.data.data).catch(() => mockNoticeOps.getAll());
+    },
   });
 
   const complaints: Complaint[] = complData?.complaints || MOCK_COMPLAINTS;
-  const notices: Notice[] = noticeData?.notices || MOCK_NOTICES;
-  const open = complaints.filter(c => c.status === 'pending').length;
+  const notices: Notice[]       = noticeData?.notices || MOCK_NOTICES;
+  const open       = complaints.filter(c => c.status === 'pending').length;
   const inProgress = complaints.filter(c => c.status === 'in_progress').length;
-  const resolved = complaints.filter(c => c.status === 'resolved').length;
+  const resolved   = complaints.filter(c => c.status === 'resolved').length;
 
-  const assignedProp = MOCK_PROPERTIES[0];
+  // Use real assigned property from user object (populated by /auth/me)
+  const assignedProp = user?.assignedProperty as any;
 
   return (
     <div className="page">
@@ -59,8 +73,8 @@ const TenantDashboard: React.FC = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 340px', gap: 24, alignItems: 'start' }}>
         {/* Left: Property + Complaints */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* My property card */}
-          {assignedProp && (
+          {/* Assigned property card */}
+          {assignedProp ? (
             <div className="card fade-up" style={{ overflow: 'hidden' }}>
               <div style={{ height: 140, background: 'linear-gradient(135deg, #dbeafe 0%, #ede9fe 100%)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {assignedProp.images?.[0] ? (
@@ -71,10 +85,12 @@ const TenantDashboard: React.FC = () => {
                 <div style={{ position: 'absolute', top: 12, left: 12 }}>
                   <span className="badge badge-brand">My Property</span>
                 </div>
-                <div style={{ position: 'absolute', bottom: 12, left: 12, display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(6px)' }}>
-                  <Star size={12} fill="#f59e0b" color="#f59e0b" />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>{assignedProp.hazardScore} Safety Score</span>
-                </div>
+                {assignedProp.hazardScore && (
+                  <div style={{ position: 'absolute', bottom: 12, left: 12, display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 8, background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(6px)' }}>
+                    <Star size={12} fill="#f59e0b" color="#f59e0b" />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>{assignedProp.hazardScore} Safety Score</span>
+                  </div>
+                )}
               </div>
               <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
                 <div>
@@ -82,14 +98,24 @@ const TenantDashboard: React.FC = () => {
                   <p style={{ fontSize: 13, color: 'var(--text-3)', margin: 0 }}>📍 {assignedProp.address}, {assignedProp.city}</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--brand)' }}>₹{assignedProp.rent.toLocaleString()}<span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>/mo</span></div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--brand)' }}>
+                    ₹{(assignedProp.rent || 0).toLocaleString()}
+                    <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>/mo</span>
+                  </div>
                   <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-                    <span>{assignedProp.bedrooms === 0 ? 'Studio' : `${assignedProp.bedrooms} BR`}</span>
-                    <span>{assignedProp.bathrooms} BA</span>
-                    <span>{assignedProp.sqft.toLocaleString()} ft²</span>
+                    {assignedProp.bedrooms !== undefined && (
+                      <span>{assignedProp.bedrooms === 0 ? 'Studio' : `${assignedProp.bedrooms} BR`}</span>
+                    )}
+                    {assignedProp.bathrooms && <span>{assignedProp.bathrooms} BA</span>}
+                    {assignedProp.sqft && <span>{(assignedProp.sqft || 0).toLocaleString()} ft²</span>}
                   </div>
                 </div>
               </div>
+            </div>
+          ) : (
+            <div className="card fade-up" style={{ padding: '24px', textAlign: 'center' }}>
+              <Home size={36} color="var(--brand)" style={{ opacity: 0.4, marginBottom: 10 }} />
+              <p style={{ fontSize: 14, color: 'var(--text-3)', margin: 0 }}>No property assigned yet. Contact your landlord or admin.</p>
             </div>
           )}
 
@@ -128,7 +154,7 @@ const TenantDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Notices */}
+        {/* Right: Notices + quick actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Quick actions */}
           <div className="card fade-up delay-2" style={{ padding: '18px 20px' }}>
@@ -136,7 +162,7 @@ const TenantDashboard: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[
                 { label: 'Raise a Complaint', icon: '⚠️', path: '/tenant/complaints', color: '#f59e0b', bg: '#fffbeb' },
-                { label: 'View My Property', icon: '🏠', path: '/tenant/property', color: '#2563eb', bg: '#eff6ff' },
+                { label: 'Browse Properties', icon: '🏠', path: '/tenant/properties', color: '#2563eb', bg: '#eff6ff' },
                 { label: 'Read Notices', icon: '📢', path: '/tenant/notices', color: '#8b5cf6', bg: '#f5f3ff' },
               ].map(a => (
                 <button key={a.path} onClick={() => navigate(a.path)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: a.bg, border: 'none', borderRadius: 'var(--r-sm)', cursor: 'pointer', fontFamily: 'var(--font-body)', color: a.color, fontWeight: 600, fontSize: 13.5, textAlign: 'left', transition: 'opacity 0.15s' }}

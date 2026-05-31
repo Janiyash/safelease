@@ -192,8 +192,8 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 export const getMe = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const user = await User.findById(req.user!.userId)
-      .populate('assignedProperty', 'title address city status')
-      .populate('ownedProperties',  'title address city status');
+      .populate('assignedProperty', 'title address city state zipCode status rent deposit bedrooms bathrooms sqft images amenities hazardScore description isApproved owner tenant availableFrom createdAt')
+      .populate('ownedProperties',  'title address city state zipCode status rent deposit bedrooms bathrooms sqft images amenities hazardScore isApproved availableFrom createdAt');
     if (!user) throw new AppError('User not found', 404);
     res.json({ success: true, data: { user } });
   } catch (err) { next(err); }

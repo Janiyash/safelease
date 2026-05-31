@@ -60,7 +60,7 @@ cd frontend && npm install && npm start
 
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | admin@safelease.com | Admin@1234 |
+| Admin | admin@safelease.com | - |
 | Owner | owner@safelease.com | Owner@1234 |
 | Tenant | tenant@safelease.com | Tenant@1234 |
 

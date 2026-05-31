@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BedDouble, Bath, Square, MapPin, Star, CheckCircle, Clock, Wrench, AlertCircle, ExternalLink, Heart } from 'lucide-react';
+import { BedDouble, Bath, Square, MapPin, Star, CheckCircle, Heart, Home } from 'lucide-react';
 import { Property } from '../../types';
 
 const statusConfig = {
@@ -22,14 +22,19 @@ interface PropertyCardProps {
   onAssign?: (id: string) => void;
   isAdmin?: boolean;
   isOwner?: boolean;
+  isOwnedByMe?: boolean;   // NEW — true when this specific card belongs to the logged-in owner
   onClick?: (p: Property) => void;
 }
 
-const PropertyCard: React.FC<PropertyCardProps> = ({ property: p, onApprove, onDelete, onAssign, isAdmin, isOwner, onClick }) => {
+const PropertyCard: React.FC<PropertyCardProps> = ({
+  property: p, onApprove, onDelete, onAssign,
+  isAdmin, isOwner, isOwnedByMe = false, onClick,
+}) => {
   const [liked, setLiked] = useState(false);
   const [imgError, setImgError] = useState(false);
   const st = statusConfig[p.status];
-  const canManage = isAdmin || isOwner;
+  // Only show management buttons for properties the owner actually owns
+  const canManage = isAdmin || isOwnedByMe;
 
   const scoreColor = p.hazardScore >= 90 ? 'var(--green)' : p.hazardScore >= 70 ? 'var(--amber)' : 'var(--red)';
 
@@ -49,10 +54,23 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property: p, onApprove, onD
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>🏠</div>
         )}
-        {/* Overlays */}
-        <div style={{ position: 'absolute', top: 12, left: 12 }}>
+
+        {/* Status badge */}
+        <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', flexDirection: 'column', gap: 5 }}>
           <span className={`badge ${st.cls}`}>{st.icon} {st.label}</span>
+          {/* OWNED tag for owner viewing their own properties */}
+          {isOwnedByMe && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '3px 9px', borderRadius: 8,
+              background: 'rgba(139,92,246,0.92)', backdropFilter: 'blur(6px)',
+              color: 'white', fontSize: 11, fontWeight: 700, letterSpacing: '0.03em',
+            }}>
+              <Home size={10} /> OWNED
+            </span>
+          )}
         </div>
+
         {!p.isApproved && (
           <div style={{ position: 'absolute', top: 12, right: 12 }}>
             <span className="badge badge-amber">⏳ Awaiting Approval</span>
@@ -114,7 +132,6 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property: p, onApprove, onD
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 13, marginTop: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {/* Owner avatar */}
               {p.owner.avatar ? (
                 <img src={p.owner.avatar} alt={p.owner.name} style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', border: '2px solid white', boxShadow: '0 1px 4px rgba(0,0,0,0.12)' }} />
               ) : (
@@ -123,7 +140,10 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property: p, onApprove, onD
                 </div>
               )}
               <div>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)' }}>{p.owner.name}</div>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-1)' }}>
+                  {p.owner.name}
+                  {isOwnedByMe && <span style={{ fontSize: 10, color: '#8b5cf6', fontWeight: 700, marginLeft: 5 }}>(You)</span>}
+                </div>
                 <div style={{ fontSize: 11, color: 'var(--text-4)' }}>Property Owner</div>
               </div>
             </div>
@@ -138,7 +158,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property: p, onApprove, onD
           </div>
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons — only for admin or the actual owner of this property */}
         {canManage && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             {isAdmin && !p.isApproved && (

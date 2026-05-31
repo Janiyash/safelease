@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, AlertCircle, Clock, CheckCircle, Plus, ArrowRight, TrendingUp, Users } from 'lucide-react';
+import { Building2, AlertCircle, Clock, Plus, ArrowRight, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { propertyApi, complaintApi } from '../../api/services';
@@ -10,27 +10,48 @@ import { MOCK_PROPERTIES, MOCK_COMPLAINTS } from '../../data/mockData';
 import PropertyCard from '../properties/PropertyCard';
 import { Property, Complaint } from '../../types';
 import { formatDistanceToNow } from 'date-fns';
+import { isMockToken } from '../../api/mockAuth';
+import { mockPropertyOps, mockComplaintOps } from '../../api/mockOperations';
+
+const isMock = () => isMockToken(localStorage.getItem('accessToken'));
 
 const OwnerDashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Fetch ALL properties (same as PropertiesPage — owner can see all)
   const { data: propsData, isLoading: propsLoading } = useQuery({
     queryKey: ['owner-properties'],
-    queryFn: () => propertyApi.getAll().then(r => r.data.data).catch(() => ({ properties: MOCK_PROPERTIES })),
-  });
-  const { data: complData, isLoading: complLoading } = useQuery({
-    queryKey: ['owner-complaints'],
-    queryFn: () => complaintApi.getAll({ limit: 5 }).then(r => r.data.data).catch(() => ({ complaints: MOCK_COMPLAINTS })),
+    staleTime: 0,
+    queryFn: async () => {
+      if (isMock()) return mockPropertyOps.getAll();
+      return propertyApi.getAll().then(r => r.data.data).catch(() => mockPropertyOps.getAll());
+    },
   });
 
-  const properties: Property[] = propsData?.properties || MOCK_PROPERTIES;
+  const { data: complData, isLoading: complLoading } = useQuery({
+    queryKey: ['owner-complaints'],
+    staleTime: 0,
+    queryFn: async () => {
+      if (isMock()) return mockComplaintOps.getAll();
+      return complaintApi.getAll({ limit: 5 }).then(r => r.data.data).catch(() => mockComplaintOps.getAll());
+    },
+  });
+
+  const allProperties: Property[] = propsData?.properties || MOCK_PROPERTIES;
   const complaints: Complaint[] = complData?.complaints || MOCK_COMPLAINTS;
-  const rented = properties.filter(p => p.status === 'rented').length;
-  const available = properties.filter(p => p.status === 'available').length;
-  const openC = complaints.filter(c => c.status === 'pending').length;
+
+  // Owned properties = those where owner._id matches user._id
+  const ownedProperties = allProperties.filter(p => {
+    const ownerId = typeof p.owner === 'object' ? p.owner._id : p.owner;
+    return ownerId === user?._id;
+  });
+
+  const rented    = ownedProperties.filter(p => p.status === 'rented').length;
+  const available = ownedProperties.filter(p => p.status === 'available').length;
+  const openC     = complaints.filter(c => c.status === 'pending').length;
   const inProgressC = complaints.filter(c => c.status === 'in_progress').length;
-  const occupancy = properties.length ? Math.round((rented / properties.length) * 100) : 0;
+  const occupancy = ownedProperties.length ? Math.round((rented / ownedProperties.length) * 100) : 0;
 
   return (
     <div className="page">
@@ -47,10 +68,10 @@ const OwnerDashboard: React.FC = () => {
         </button>
       </div>
 
-      {/* Stats */}
+      {/* Stats — based on owner's own properties */}
       {propsLoading ? <StatsGridSkeleton count={4} /> : (
         <div className="stats-grid" style={{ marginBottom: 32 }}>
-          <StatCard label="Total Properties" value={properties.length} icon={<Building2 size={18}/>} color="#8b5cf6" bg="#f5f3ff" sub="In your portfolio" />
+          <StatCard label="My Properties" value={ownedProperties.length} icon={<Building2 size={18}/>} color="#8b5cf6" bg="#f5f3ff" sub={`${allProperties.length} total in market`} />
           <StatCard label="Occupancy Rate" value={`${occupancy}%`} icon={<TrendingUp size={18}/>} color="#10b981" bg="#ecfdf5" sub={`${rented} rented, ${available} available`} />
           <StatCard label="Open Complaints" value={openC} icon={<AlertCircle size={18}/>} color="#f59e0b" bg="#fffbeb" sub="Need your attention" />
           <StatCard label="In Progress" value={inProgressC} icon={<Clock size={18}/>} color="#2563eb" bg="#eff6ff" sub="Being resolved" />
@@ -58,23 +79,25 @@ const OwnerDashboard: React.FC = () => {
       )}
 
       {/* Occupancy progress */}
-      <div className="card fade-up delay-1" style={{ padding: '20px 24px', marginBottom: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-2)' }}>Portfolio Occupancy</span>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: occupancy >= 70 ? '#10b981' : '#f59e0b' }}>{occupancy}%</span>
+      {ownedProperties.length > 0 && (
+        <div className="card fade-up delay-1" style={{ padding: '20px 24px', marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-2)' }}>Portfolio Occupancy</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: occupancy >= 70 ? '#10b981' : '#f59e0b' }}>{occupancy}%</span>
+          </div>
+          <div className="progress-track">
+            <div className="progress-fill" style={{ width: `${occupancy}%`, background: occupancy >= 70 ? 'var(--green)' : 'var(--amber)' }} />
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
+            <span>{rented} rented</span>
+            <span>{available} available</span>
+            <span>{ownedProperties.filter(p => p.status === 'maintenance').length} maintenance</span>
+          </div>
         </div>
-        <div className="progress-track">
-          <div className="progress-fill" style={{ width: `${occupancy}%`, background: occupancy >= 70 ? 'var(--green)' : 'var(--amber)' }} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
-          <span>{rented} rented</span>
-          <span>{available} available</span>
-          <span>{properties.filter(p => p.status === 'maintenance').length} maintenance</span>
-        </div>
-      </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 380px', gap: 24, alignItems: 'start' }}>
-        {/* Properties grid (first 3) */}
+        {/* My properties grid (first 3 owned) */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 18, margin: 0 }}>My Properties</h2>
@@ -86,16 +109,16 @@ const OwnerDashboard: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
               {Array.from({length:3}).map((_,i) => <PropertyCardSkeleton key={i} />)}
             </div>
-          ) : properties.length === 0 ? (
+          ) : ownedProperties.length === 0 ? (
             <div className="card" style={{ padding: 0 }}>
               <EmptyState title="No properties yet" message="Add your first property to start managing tenants." icon={<Building2 size={26} color="var(--brand)" />}
                 action={<button className="btn btn-primary" onClick={() => navigate('/owner/properties')}><Plus size={14}/> Add Property</button>} />
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
-              {properties.slice(0,3).map((p, i) => (
+              {ownedProperties.slice(0, 3).map((p, i) => (
                 <div key={p._id} className={`delay-${i+1}`}>
-                  <PropertyCard property={p} isOwner onClick={() => navigate('/owner/properties')} />
+                  <PropertyCard property={p} isOwner isOwnedByMe onClick={() => navigate('/owner/properties')} />
                 </div>
               ))}
             </div>

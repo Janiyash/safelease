@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../api/services';
 import { Spinner } from '../skeleton/Skeletons';
 import { TwoFactorVerify } from './twoFactor/TwoFactorVerify';
+import { mockLogin } from '../../api/mockAuth';
 
 const AuthLayout: React.FC<{ children: React.ReactNode; title: string; subtitle: string }> = ({ children, title, subtitle }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -56,6 +57,7 @@ const Err: React.FC<{ msg: string }> = ({ msg }) => (
 );
 
 const DEMO = [
+  { label: 'Admin',  email: 'admin@safelease.com',  password: 'Admin@1234' },
   { label: 'Owner',  email: 'owner@safelease.com',  password: 'Owner@1234' },
   { label: 'Tenant', email: 'tenant@safelease.com', password: 'Tenant@1234' },
 ];
@@ -97,9 +99,17 @@ export const LoginPage: React.FC = () => {
       toast.success(`Welcome${label ? ` (${label})` : ''}, ${user.name.split(' ')[0]}!`);
       nav(`/${user.role}`, { replace: true });
     } catch (e: any) {
-      const msg = e.response?.data?.message || 'Login failed. Is the backend running?';
-      setErr(msg);
-      toast.error(msg);
+      // ── Offline / backend-down fallback: use mock data ────────────────────
+      try {
+        const { user, accessToken } = mockLogin(email, password);
+        login(user, accessToken);
+        toast.success(`Welcome${label ? ` (${label})` : ''}, ${user.name.split(' ')[0]}! (Demo mode)`);
+        nav(`/${user.role}`, { replace: true });
+      } catch {
+        const msg = e.response?.data?.message || 'Login failed. Is the backend running?';
+        setErr(msg);
+        toast.error(msg);
+      }
     }
   };
 
@@ -151,7 +161,7 @@ export const LoginPage: React.FC = () => {
         </p>
       </form>
       <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-4)', textAlign: 'center', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Quick Demo (seed required)</p>
+        <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-4)', textAlign: 'center', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Quick Demo Login</p>
         <div style={{ display: 'flex', gap: 8 }}>
           {DEMO.map(d => (
             <button key={d.label} disabled={!!demo} onClick={() => loginDemo(d)}
