@@ -6,13 +6,9 @@ import { useAuth } from '../../context/AuthContext';
 import { complaintApi, noticeApi } from '../../api/services';
 import { StatCard, StatusBadge, EmptyState } from '../shared';
 import { StatsGridSkeleton, ComplaintSkeleton } from '../skeleton/Skeletons';
-import { MOCK_COMPLAINTS, MOCK_NOTICES } from '../../data/mockData';
 import { Complaint, Notice } from '../../types';
 import { formatDistanceToNow } from 'date-fns';
-import { isMockToken } from '../../api/mockAuth';
-import { mockComplaintOps, mockNoticeOps } from '../../api/mockOperations';
 
-const isMock = () => isMockToken(localStorage.getItem('accessToken'));
 
 const categoryColors: Record<string, string> = {
   emergency: '#ef4444', maintenance: '#f59e0b', general: '#2563eb', event: '#10b981', billing: '#8b5cf6',
@@ -25,23 +21,17 @@ const TenantDashboard: React.FC = () => {
   const { data: complData, isLoading: complLoading } = useQuery({
     queryKey: ['complaints'],
     staleTime: 0,
-    queryFn: async () => {
-      if (isMock()) return mockComplaintOps.getAll();
-      return complaintApi.getAll({ limit: 5 }).then(r => r.data.data).catch(() => mockComplaintOps.getAll());
-    },
+    queryFn: async () => complaintApi.getAll({ limit: 5 }).then(r => r.data.data),
   });
 
   const { data: noticeData, isLoading: noticeLoading } = useQuery({
     queryKey: ['notices'],
     staleTime: 0,
-    queryFn: async () => {
-      if (isMock()) return mockNoticeOps.getAll();
-      return noticeApi.getAll({ limit: 4 }).then(r => r.data.data).catch(() => mockNoticeOps.getAll());
-    },
+    queryFn: async () => noticeApi.getAll({ limit: 4 }).then(r => r.data.data),
   });
 
-  const complaints: Complaint[] = complData?.complaints || MOCK_COMPLAINTS;
-  const notices: Notice[]       = noticeData?.notices || MOCK_NOTICES;
+  const complaints: Complaint[] = complData?.complaints || [];
+  const notices: Notice[]       = noticeData?.notices || [];
   const open       = complaints.filter(c => c.status === 'pending').length;
   const inProgress = complaints.filter(c => c.status === 'in_progress').length;
   const resolved   = complaints.filter(c => c.status === 'resolved').length;

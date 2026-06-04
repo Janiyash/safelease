@@ -6,14 +6,10 @@ import { useAuth } from '../../context/AuthContext';
 import { propertyApi, complaintApi } from '../../api/services';
 import { StatCard, StatusBadge, EmptyState } from '../shared';
 import { StatsGridSkeleton, PropertyCardSkeleton } from '../skeleton/Skeletons';
-import { MOCK_PROPERTIES, MOCK_COMPLAINTS } from '../../data/mockData';
 import PropertyCard from '../properties/PropertyCard';
 import { Property, Complaint } from '../../types';
 import { formatDistanceToNow } from 'date-fns';
-import { isMockToken } from '../../api/mockAuth';
-import { mockPropertyOps, mockComplaintOps } from '../../api/mockOperations';
 
-const isMock = () => isMockToken(localStorage.getItem('accessToken'));
 
 const OwnerDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -23,23 +19,17 @@ const OwnerDashboard: React.FC = () => {
   const { data: propsData, isLoading: propsLoading } = useQuery({
     queryKey: ['owner-properties'],
     staleTime: 0,
-    queryFn: async () => {
-      if (isMock()) return mockPropertyOps.getAll();
-      return propertyApi.getAll().then(r => r.data.data).catch(() => mockPropertyOps.getAll());
-    },
+    queryFn: async () => propertyApi.getAll().then(r => r.data.data),
   });
 
   const { data: complData, isLoading: complLoading } = useQuery({
     queryKey: ['owner-complaints'],
     staleTime: 0,
-    queryFn: async () => {
-      if (isMock()) return mockComplaintOps.getAll();
-      return complaintApi.getAll({ limit: 5 }).then(r => r.data.data).catch(() => mockComplaintOps.getAll());
-    },
+    queryFn: async () => complaintApi.getAll({ limit: 5 }).then(r => r.data.data),
   });
 
-  const allProperties: Property[] = propsData?.properties || MOCK_PROPERTIES;
-  const complaints: Complaint[] = complData?.complaints || MOCK_COMPLAINTS;
+  const allProperties: Property[] = propsData?.properties || [];
+  const complaints: Complaint[] = complData?.complaints || [];
 
   // Owned properties = those where owner._id matches user._id
   const ownedProperties = allProperties.filter(p => {

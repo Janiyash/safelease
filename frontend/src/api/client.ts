@@ -2,6 +2,10 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
+if (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_API_URL) {
+  console.error('[SafeLease] REACT_APP_API_URL is not set! Add it in your Vercel environment variables.');
+}
+
 export const api = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,

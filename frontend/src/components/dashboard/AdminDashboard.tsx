@@ -4,10 +4,6 @@ import { Users, Building2, AlertCircle, Bell, TrendingUp, CheckCircle, Clock, Sh
 import { adminApi } from '../../api/services';
 import { StatCard, StatusBadge } from '../shared';
 import { StatsGridSkeleton, Spinner } from '../skeleton/Skeletons';
-import { MOCK_ANALYTICS, MOCK_COMPLAINTS, MOCK_TENANTS } from '../../data/mockData';
-import { getMockAnalytics } from '../../api/mockOperations';
-import { isMockToken } from '../../api/mockAuth';
-const isMock = () => isMockToken(localStorage.getItem('accessToken'));
 import { Analytics } from '../../types';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -20,10 +16,7 @@ const MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','
 const AdminDashboard: React.FC = () => {
   const { data, isLoading } = useQuery<Analytics>({
     queryKey: ['analytics'],
-    queryFn: async () => {
-      if (isMock()) return getMockAnalytics();
-      return adminApi.getAnalytics().then(r => r.data.data).catch(() => getMockAnalytics());
-    },
+    queryFn: async () => adminApi.getAnalytics().then(r => r.data.data),
     refetchInterval: 60_000,
   });
 
@@ -181,7 +174,7 @@ const AdminDashboard: React.FC = () => {
             <AlertCircle size={15} color="var(--brand)" /> Recent Complaints
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(data.recent.complaints.length ? data.recent.complaints : MOCK_COMPLAINTS).slice(0,4).map(c => (
+            {data.recent.complaints.slice(0,4).map(c => (
               <div key={c._id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 13.5, fontWeight: 600, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.title}</p>
@@ -198,7 +191,7 @@ const AdminDashboard: React.FC = () => {
             <Users size={15} color="var(--brand)" /> New Users
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(data.recent.users.length ? data.recent.users : MOCK_TENANTS).slice(0,4).map(u => (
+            {data.recent.users.slice(0,4).map(u => (
               <div key={u._id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', border: '1px solid var(--border)' }}>
                 <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                   {u.name.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()}

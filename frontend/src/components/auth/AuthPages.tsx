@@ -99,17 +99,12 @@ export const LoginPage: React.FC = () => {
       toast.success(`Welcome${label ? ` (${label})` : ''}, ${user.name.split(' ')[0]}!`);
       nav(`/${user.role}`, { replace: true });
     } catch (e: any) {
-      // ── Offline / backend-down fallback: use mock data ────────────────────
-      try {
-        const { user, accessToken } = mockLogin(email, password);
-        login(user, accessToken);
-        toast.success(`Welcome${label ? ` (${label})` : ''}, ${user.name.split(' ')[0]}! (Demo mode)`);
-        nav(`/${user.role}`, { replace: true });
-      } catch {
-        const msg = e.response?.data?.message || 'Login failed. Is the backend running?';
-        setErr(msg);
-        toast.error(msg);
-      }
+      const isNetworkErr = !e.response;
+      const msg = isNetworkErr
+        ? `Cannot reach backend. Check your REACT_APP_API_URL environment variable.`
+        : (e.response?.data?.message || 'Login failed.');
+      setErr(msg);
+      toast.error(msg);
     }
   };
 
@@ -201,7 +196,10 @@ export const SignupPage: React.FC = () => {
       toast.success('Account created!');
       nav(`/${user.role}`, { replace: true });
     } catch (e: any) {
-      setErr(e.response?.data?.message || 'Signup failed. Is the backend running?');
+      const isNetworkErr = !e.response;
+      setErr(isNetworkErr
+        ? 'Cannot reach backend. Check your REACT_APP_API_URL environment variable.'
+        : (e.response?.data?.message || 'Signup failed.'));
     }
   };
 

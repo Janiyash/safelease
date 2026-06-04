@@ -3,9 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, UserCheck, UserX, Shield } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { adminApi } from '../../api/services';
-import { mockUserOps } from '../../api/mockOperations';
-import { isMockToken } from '../../api/mockAuth';
-const isMock = () => isMockToken(localStorage.getItem('accessToken'));
 import { User, UserRole } from '../../types';
 import { StatusBadge, EmptyState, Spinner, Modal, Field, inputStyle } from '../shared';
 import { format } from 'date-fns';
@@ -24,14 +21,12 @@ const UsersPage: React.FC = () => {
     staleTime: 0,
     queryFn: async () => {
       const params = { search: search || undefined, role: roleFilter !== 'all' ? roleFilter : undefined };
-      if (isMock()) return mockUserOps.getAll(params);
-      return adminApi.getUsers(params).then(r => r.data.data).catch(() => mockUserOps.getAll(params));
+      return adminApi.getUsers(params).then(r => r.data.data);
     },
   });
 
   const toggleMut = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      if (isMock()) return mockUserOps.updateStatus(id, isActive);
       return adminApi.updateUserStatus(id, isActive);
     },
     onSuccess: (_d, vars) => { toast.success(vars.isActive ? 'User activated' : 'User deactivated'); qc.invalidateQueries({ queryKey: ['admin-users'] }); },
@@ -40,7 +35,6 @@ const UsersPage: React.FC = () => {
 
   const roleMut = useMutation({
     mutationFn: async ({ id, role }: { id: string; role: string }) => {
-      if (isMock()) return mockUserOps.updateRole(id, role);
       return adminApi.updateUserRole(id, role);
     },
     onSuccess: () => { toast.success('Role updated'); setRoleModal(null); qc.invalidateQueries({ queryKey: ['admin-users'] }); },

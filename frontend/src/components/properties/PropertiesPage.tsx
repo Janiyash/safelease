@@ -12,10 +12,6 @@ import PropertyCard from './PropertyCard';
 import SearchFilterBar from '../search/SearchFilterBar';
 import { PropertyGridSkeleton } from '../skeleton/Skeletons';
 import { Modal, EmptyState, ErrorMessage, Field, Spinner } from '../shared';
-import { isMockToken } from '../../api/mockAuth';
-import { mockPropertyOps, getMockTenants } from '../../api/mockOperations';
-
-const isMock = () => isMockToken(localStorage.getItem('accessToken'));
 
 const schema = z.object({
   title:       z.string().min(5, 'Title required'),
@@ -49,15 +45,7 @@ const PropertiesPage: React.FC = () => {
   const { data, isLoading, error } = useQuery({
     queryKey: ['properties'],
     staleTime: 0,
-    queryFn: async () => {
-      if (isMock()) return mockPropertyOps.getAll();
-      try {
-        const res = await propertyApi.getAll();
-        return res.data.data as { properties: Property[]; total: number };
-      } catch {
-        return mockPropertyOps.getAll();
-      }
-    },
+    queryFn: async () => propertyApi.getAll().then(r => r.data.data as { properties: Property[]; total: number }),
   });
 
   // Fetch tenants for assign modal — normalise to always be any[]
@@ -66,18 +54,9 @@ const PropertiesPage: React.FC = () => {
     enabled: isAdmin || isOwner,
     staleTime: 30_000,
     queryFn: async () => {
-      if (isMock()) {
-        const result = await getMockTenants();
-        return result.users;
-      }
-      try {
-        const res = await adminApi.getUsers({ role: 'tenant' });
-        const d = res.data.data as { users: any[] };
-        return d.users;
-      } catch {
-        const result = await getMockTenants();
-        return result.users;
-      }
+      const res = await adminApi.getUsers({ role: 'tenant' });
+      const d = res.data.data as { users: any[] };
+      return d.users;
     },
   });
 
@@ -86,9 +65,6 @@ const PropertiesPage: React.FC = () => {
   // Fix TS2322: mutationFn always returns Promise<any> so both branches are compatible
   const createMut = useMutation<any, any, FD>({
     mutationFn: async (fd: FD) => {
-      if (isMock()) {
-        return { data: { success: true } };
-      }
       const form = new window.FormData();
       Object.entries(fd).forEach(([k, v]) => v !== undefined && form.append(k, String(v)));
       if (imgFiles) Array.from(imgFiles).forEach(f => form.append('images', f));
@@ -103,18 +79,12 @@ const PropertiesPage: React.FC = () => {
   });
 
   const approveMut = useMutation<any, any, string>({
-    mutationFn: async (id: string) => {
-      if (isMock()) return mockPropertyOps.approve(id);
-      return propertyApi.approve(id);
-    },
+    mutationFn: async (id: string) => propertyApi.approve(id),
     onSuccess: () => { toast.success('Approved!'); qc.invalidateQueries({ queryKey: ['properties'] }); },
   });
 
   const deleteMut = useMutation<any, any, string>({
-    mutationFn: async (id: string) => {
-      if (isMock()) return mockPropertyOps.delete(id);
-      return propertyApi.delete(id);
-    },
+    mutationFn: async (id: string) => propertyApi.delete(id),
     onSuccess: () => { toast.success('Deleted'); qc.invalidateQueries({ queryKey: ['properties'] }); },
   });
 
@@ -241,11 +211,7 @@ const PropertiesPage: React.FC = () => {
                 {tenants.map((t: any) => (
                   <button key={t._id} onClick={async () => {
                     try {
-                      if (isMock()) {
-                        await mockPropertyOps.assignTenant(assignModal, t._id);
-                      } else {
-                        await propertyApi.assignTenant(assignModal, t._id);
-                      }
+                      await propertyApi.assignTenant(assignModal, t._id);
                       toast.success(`${t.name} assigned!`);
                       setAssignModal(null);
                       qc.invalidateQueries({ queryKey: ['properties'] });
